@@ -40,16 +40,24 @@ class CodeEditor {
                 'Ctrl-Enter': () => this.runCode(),
                 'Ctrl-S': () => this.saveCurrentFile(),
                 'Ctrl-N': () => this.showNewFileModal(),
-                'Ctrl-F': () => this.searchFiles()
+                'Ctrl-F': () => this.searchFiles(),
+                'Tab': () => this.handleTabCompletion(),
+                'Ctrl-Space': () => this.triggerSuggestions()
             }
         });
         
         // Set initial content
         this.editor.setValue('# Welcome to Python Code Editor!\n# Start coding here...\n\nprint("Hello, World!")');
         
-        // Handle content changes for LLaMA3 suggestions
-        this.editor.on('change', () => {
+        // Handle content changes for real-time suggestions
+        this.editor.on('change', (cm, change) => {
             this.handleCodeChange();
+            this.handleRealTimeSuggestions(change);
+        });
+        
+        // Handle cursor movement for context-aware suggestions
+        this.editor.on('cursorActivity', () => {
+            this.updateContextSuggestions();
         });
     }
     
@@ -58,6 +66,7 @@ class CodeEditor {
         document.getElementById('runBtn').addEventListener('click', () => this.runCode());
         document.getElementById('saveBtn').addEventListener('click', () => this.saveCurrentFile());
         document.getElementById('newFileBtn').addEventListener('click', () => this.showNewFileModal());
+        document.getElementById('downloadBtn').addEventListener('click', () => this.downloadWorkspace());
         document.getElementById('refreshFilesBtn').addEventListener('click', () => this.loadFiles());
         document.getElementById('createFolderBtn').addEventListener('click', () => this.showNewFolderModal());
         
@@ -294,6 +303,235 @@ class CodeEditor {
         }, 1000);
     }
     
+    handleRealTimeSuggestions(change) {
+        // Handle real-time code suggestions based on user input
+        if (change.text && change.text.length > 0) {
+            const line = change.text[0];
+            const cursor = this.editor.getCursor();
+            const lineText = this.editor.getLine(cursor.line);
+            
+            // Check for common patterns and provide instant suggestions
+            this.checkForPatterns(lineText, cursor);
+        }
+    }
+    
+    checkForPatterns(lineText, cursor) {
+        const patterns = {
+            '#function to add': 'def add(num1, num2):\n    return num1 + num2',
+            '#function to multiply': 'def multiply(num1, num2):\n    return num1 * num2',
+            '#function to divide': 'def divide(num1, num2):\n    if num2 != 0:\n        return num1 / num2\n    else:\n        raise ValueError("Cannot divide by zero")',
+            '#function to subtract': 'def subtract(num1, num2):\n    return num1 - num2',
+            '#class': 'class MyClass:\n    def __init__(self):\n        pass\n    \n    def method(self):\n        pass',
+            '#if statement': 'if condition:\n    # code here\n    pass\nelse:\n    # code here\n    pass',
+            '#for loop': 'for item in items:\n    # code here\n    pass',
+            '#while loop': 'while condition:\n    # code here\n    pass',
+            '#try except': 'try:\n    # code here\n    pass\nexcept Exception as e:\n    # handle error\n    pass',
+            '#import': 'import os\nimport sys',
+            '#main': 'if __name__ == "__main__":\n    main()',
+            '#docstring': '"""\nFunction description\n\nArgs:\n    param1: description\n\nReturns:\n    description\n"""'
+        };
+        
+        for (const [pattern, suggestion] of Object.entries(patterns)) {
+            if (lineText.includes(pattern)) {
+                this.showQuickSuggestion(suggestion, cursor);
+                break;
+            }
+        }
+    }
+    
+    showQuickSuggestion(suggestion, cursor) {
+        // Show quick suggestion popup
+        const suggestionPopup = document.createElement('div');
+        suggestionPopup.className = 'quick-suggestion-popup';
+        suggestionPopup.innerHTML = `
+            <div class="suggestion-header">
+                <i class="fas fa-lightbulb"></i>
+                <span>Quick Suggestion</span>
+                <button class="close-suggestion">&times;</button>
+            </div>
+            <div class="suggestion-content">
+                <pre><code>${this.escapeHtml(suggestion)}</code></pre>
+            </div>
+            <div class="suggestion-actions">
+                <button class="btn btn-primary accept-suggestion">Accept (Tab)</button>
+                <button class="btn btn-secondary ignore-suggestion">Ignore</button>
+            </div>
+        `;
+        
+        // Position the popup near the cursor
+        const coords = this.editor.cursorCoords(cursor, 'page');
+        suggestionPopup.style.position = 'absolute';
+        suggestionPopup.style.left = coords.left + 'px';
+        suggestionPopup.style.top = (coords.bottom + 10) + 'px';
+        suggestionPopup.style.zIndex = '1000';
+        
+        document.body.appendChild(suggestionPopup);
+        
+        // Handle suggestion acceptance
+        suggestionPopup.querySelector('.accept-suggestion').addEventListener('click', () => {
+            this.acceptSuggestion(suggestion, cursor);
+            suggestionPopup.remove();
+        });
+        
+        // Handle suggestion rejection
+        suggestionPopup.querySelector('.ignore-suggestion').addEventListener('click', () => {
+            suggestionPopup.remove();
+        });
+        
+        // Handle close button
+        suggestionPopup.querySelector('.close-suggestion').addEventListener('click', () => {
+            suggestionPopup.remove();
+        });
+        
+        // Auto-remove after 10 seconds
+        setTimeout(() => {
+            if (suggestionPopup.parentNode) {
+                suggestionPopup.remove();
+            }
+        }, 10000);
+    }
+    
+    acceptSuggestion(suggestion, cursor) {
+        // Replace the current line with the suggestion
+        const line = cursor.line;
+        this.editor.replaceRange(suggestion, {line: line, ch: 0}, {line: line, ch: this.editor.getLine(line).length});
+        
+        // Position cursor at the end of the suggestion
+        const lines = suggestion.split('\n');
+        const newLine = line + lines.length - 1;
+        const newCh = lines[lines.length - 1].length;
+        this.editor.setCursor({line: newLine, ch: newCh});
+        
+        this.showNotification('Suggestion applied!', 'success');
+    }
+    
+    handleTabCompletion() {
+        // Handle tab completion for suggestions
+        const cursor = this.editor.getCursor();
+        const lineText = this.editor.getLine(cursor.line);
+        
+        // Check if there's an active suggestion
+        const activeSuggestion = document.querySelector('.quick-suggestion-popup');
+        if (activeSuggestion) {
+            const suggestionContent = activeSuggestion.querySelector('.suggestion-content pre code').textContent;
+            this.acceptSuggestion(suggestionContent, cursor);
+            activeSuggestion.remove();
+            return true; // Prevent default tab behavior
+        }
+        
+        // Default tab behavior (indentation)
+        return false;
+    }
+    
+    triggerSuggestions() {
+        // Manually trigger suggestions with Ctrl+Space
+        const cursor = this.editor.getCursor();
+        const lineText = this.editor.getLine(cursor.line);
+        
+        // Show common suggestions
+        this.showCommonSuggestions(cursor);
+    }
+    
+    showCommonSuggestions(cursor) {
+        const suggestions = [
+            'def function_name():\n    pass',
+            'class ClassName:\n    def __init__(self):\n        pass',
+            'if condition:\n    pass',
+            'for item in items:\n    pass',
+            'while condition:\n    pass',
+            'try:\n    pass\nexcept Exception as e:\n    pass',
+            'import os\nimport sys',
+            'print("Hello, World!")',
+            'return value',
+            'raise Exception("Error message")'
+        ];
+        
+        const suggestionPopup = document.createElement('div');
+        suggestionPopup.className = 'common-suggestions-popup';
+        suggestionPopup.innerHTML = `
+            <div class="suggestions-header">
+                <i class="fas fa-list"></i>
+                <span>Common Code Patterns</span>
+                <button class="close-suggestions">&times;</button>
+            </div>
+            <div class="suggestions-list">
+                ${suggestions.map((suggestion, index) => `
+                    <div class="suggestion-item" data-index="${index}">
+                        <pre><code>${this.escapeHtml(suggestion)}</code></pre>
+                        <button class="btn btn-sm btn-primary use-suggestion">Use</button>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        
+        // Position the popup
+        const coords = this.editor.cursorCoords(cursor, 'page');
+        suggestionPopup.style.position = 'absolute';
+        suggestionPopup.style.left = coords.left + 'px';
+        suggestionPopup.style.top = (coords.bottom + 10) + 'px';
+        suggestionPopup.style.zIndex = '1000';
+        
+        document.body.appendChild(suggestionPopup);
+        
+        // Handle suggestion selection
+        suggestionPopup.querySelectorAll('.use-suggestion').forEach((btn, index) => {
+            btn.addEventListener('click', () => {
+                this.acceptSuggestion(suggestions[index], cursor);
+                suggestionPopup.remove();
+            });
+        });
+        
+        // Handle close button
+        suggestionPopup.querySelector('.close-suggestions').addEventListener('click', () => {
+            suggestionPopup.remove();
+        });
+        
+        // Auto-remove after 15 seconds
+        setTimeout(() => {
+            if (suggestionPopup.parentNode) {
+                suggestionPopup.remove();
+            }
+        }, 15000);
+    }
+    
+    updateContextSuggestions() {
+        // Update context-aware suggestions based on cursor position
+        const cursor = this.editor.getCursor();
+        const lineText = this.editor.getLine(cursor.line);
+        
+        // Show context hints in the suggestions panel
+        this.updateContextHints(lineText);
+    }
+    
+    updateContextHints(lineText) {
+        const suggestionsContent = document.getElementById('suggestionsContent');
+        
+        // Analyze the current line for context hints
+        let contextHint = '';
+        
+        if (lineText.includes('def ')) {
+            contextHint = '💡 Function definition detected. Consider adding a docstring and type hints.';
+        } else if (lineText.includes('class ')) {
+            contextHint = '💡 Class definition detected. Consider adding methods and documentation.';
+        } else if (lineText.includes('import ')) {
+            contextHint = '💡 Import statement detected. Consider organizing imports at the top of the file.';
+        } else if (lineText.includes('if ') || lineText.includes('elif ') || lineText.includes('else:')) {
+            contextHint = '💡 Conditional statement detected. Consider adding comments for complex logic.';
+        } else if (lineText.includes('for ') || lineText.includes('while ')) {
+            contextHint = '💡 Loop detected. Consider adding break conditions and error handling.';
+        } else if (lineText.includes('try:') || lineText.includes('except ')) {
+            contextHint = '💡 Exception handling detected. Consider specific exception types.';
+        }
+        
+        if (contextHint) {
+            // Add context hint to existing suggestions
+            const existingContent = suggestionsContent.innerHTML;
+            if (!existingContent.includes(contextHint)) {
+                suggestionsContent.innerHTML = `<div class="context-hint">${contextHint}</div>` + existingContent;
+            }
+        }
+    }
+    
     async getSuggestions() {
         const code = this.editor.getValue();
         if (!code.trim() || code.length < 10) {
@@ -398,16 +636,14 @@ class CodeEditor {
         }
         
         try {
-            // For now, we'll create an empty Python file as a placeholder
-            // In a real implementation, you'd want to create actual directories
-            const response = await fetch('/api/files', {
+            // Create the folder structure
+            const response = await fetch('/api/folders', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    path: `${folderName}/__init__.py`,
-                    content: `# ${folderName} package`
+                    path: folderName
                 })
             });
             
@@ -422,6 +658,41 @@ class CodeEditor {
             }
         } catch (error) {
             this.showNotification(`Creation error: ${error.message}`, 'error');
+        }
+    }
+    
+    async downloadWorkspace() {
+        try {
+            this.showLoading(true);
+            
+            const response = await fetch('/api/download', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'python_code_editor_workspace.zip';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                this.showNotification('Workspace downloaded successfully!', 'success');
+            } else {
+                const error = await response.json();
+                this.showNotification(`Download failed: ${error.error}`, 'error');
+            }
+        } catch (error) {
+            this.showNotification(`Download error: ${error.message}`, 'error');
+        } finally {
+            this.showLoading(false);
         }
     }
     

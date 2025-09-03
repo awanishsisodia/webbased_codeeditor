@@ -83,6 +83,56 @@ def delete_file(file_path):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/folders', methods=['POST'])
+def create_folder():
+    """Create a new folder"""
+    try:
+        data = request.get_json()
+        folder_path = data.get('path')
+        
+        if not folder_path:
+            return jsonify({'success': False, 'error': 'Folder path is required'}), 400
+        
+        file_manager.create_directory(folder_path)
+        return jsonify({'success': True, 'message': 'Folder created successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/download', methods=['POST'])
+def download_workspace():
+    """Download workspace as ZIP file"""
+    try:
+        import zipfile
+        import io
+        from pathlib import Path
+        
+        # Create ZIP file in memory
+        zip_buffer = io.BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            workspace_path = Path(WORKSPACE_DIR)
+            
+            # Add all files from workspace
+            for file_path in workspace_path.rglob('*'):
+                if file_path.is_file():
+                    # Get relative path for ZIP
+                    relative_path = file_path.relative_to(workspace_path)
+                    zip_file.write(file_path, relative_path)
+        
+        # Prepare response
+        zip_buffer.seek(0)
+        response = send_file(
+            io.BytesIO(zip_buffer.getvalue()),
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name='python_code_editor_workspace.zip'
+        )
+        
+        return response
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/execute', methods=['POST'])
 def execute_code():
     """Execute Python code"""

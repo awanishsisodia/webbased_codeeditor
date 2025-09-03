@@ -5,11 +5,14 @@ A web-based Python code editor that provides intelligent code recommendations us
 ## Features
 
 - **Web-based Code Editor**: Modern, responsive interface with syntax highlighting
-- **LLaMA3 Integration**: AI-powered code recommendations and suggestions
-- **Python Code Execution**: Run Python code directly in the browser
-- **Filesystem Management**: Create, edit, save, and organize Python files
+- **Ollama AI Integration**: AI-powered code recommendations and suggestions
+- **Real-time Code Suggestions**: Instant suggestions as you type with Tab completion
+- **Python Code Execution**: Fast Python code execution with caching
+- **Filesystem Management**: Create, edit, save, and organize Python files and folders
 - **Error Analysis**: Post-execution error analysis with intelligent fix recommendations
-- **Auto-completion**: Context-aware code suggestions powered by LLaMA3
+- **Context-aware Hints**: Smart suggestions based on your current code context
+- **Workspace Download**: Download your entire workspace as a ZIP file
+- **Keyboard Shortcuts**: Tab completion, Ctrl+Space for suggestions, Ctrl+Enter to run
 
 ## Prerequisites
 
@@ -77,8 +80,20 @@ CodeEditor/
 1. Open the web interface in your browser
 2. Use the file tree to navigate and create Python files
 3. Write Python code in the editor
-4. Use Ctrl+Enter to execute code
+4. Use **Ctrl+Enter** to execute code
 5. View execution results and any errors
+
+### Real-time Suggestions
+- **Type patterns** like `#function to add` and press **Tab** for instant suggestions
+- **Press Ctrl+Space** to see common code patterns
+- **Context hints** appear automatically as you code
+- **Tab completion** accepts suggestions instantly
+
+### File Management
+- **Create folders**: Click "New Folder" button
+- **Create files**: Click "New File" button  
+- **Download workspace**: Click "Download" button to get ZIP file
+- **Organize projects**: Drag and drop files in the file tree
 
 ### LLaMA3 Integration
 - Code suggestions appear as you type

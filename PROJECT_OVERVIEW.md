@@ -86,6 +86,10 @@ WORKSPACE_DIR=./workspace              # Workspace directory
 - `Ctrl+S`: Save file
 - `Ctrl+N`: Create new file
 - `Ctrl+F`: Search files
+- `Tab`: Accept suggestion or indent
+- `Ctrl+Space`: Show common code patterns
+- `Ctrl+D`: Duplicate line
+- `Ctrl+Shift+K`: Delete line
 
 ## 🤖 Ollama Integration
 

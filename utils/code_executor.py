@@ -15,13 +15,22 @@ class CodeExecutor:
     """Safe Python code execution with sandboxing"""
     
     def __init__(self):
-        self.timeout = 10  # seconds
+        self.timeout = 5  # seconds - reduced for faster response
         self.max_output_size = 10000  # characters
+        self.execution_cache = {}  # Cache for repeated code execution
         
     def execute(self, code: str) -> Dict[str, Any]:
         """Execute Python code safely and return results"""
         if not code.strip():
             return {"output": "", "error": "No code provided"}
+        
+        # Check cache for identical code
+        code_hash = hash(code.strip())
+        if code_hash in self.execution_cache:
+            cached_result = self.execution_cache[code_hash]
+            # Return cached result for read-only operations
+            if not self._has_side_effects(code):
+                return cached_result.copy()
         
         # Create temporary file for execution
         with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as temp_file:
@@ -31,6 +40,16 @@ class CodeExecutor:
         try:
             # Execute the code
             result = self._run_code(temp_file_path)
+            
+            # Cache the result for future use
+            if not self._has_side_effects(code):
+                self.execution_cache[code_hash] = result.copy()
+                # Limit cache size
+                if len(self.execution_cache) > 100:
+                    # Remove oldest entries
+                    oldest_key = next(iter(self.execution_cache))
+                    del self.execution_cache[oldest_key]
+            
             return result
         finally:
             # Clean up temporary file
@@ -173,3 +192,15 @@ class CodeExecutor:
             "has_loops": any(keyword in code for keyword in ["for ", "while "]),
             "has_conditionals": any(keyword in code for keyword in ["if ", "elif ", "else:"]),
         }
+    
+    def _has_side_effects(self, code: str) -> bool:
+        """Check if code has potential side effects (file I/O, network, etc.)"""
+        side_effect_patterns = [
+            'open(', 'write(', 'print(', 'input(', 'raw_input(',
+            'file(', 'urllib', 'requests', 'socket', 'subprocess',
+            'os.system', 'os.popen', 'eval(', 'exec(', 'compile(',
+            'globals()', 'locals()', 'vars()', 'dir()'
+        ]
+        
+        code_lower = code.lower()
+        return any(pattern in code_lower for pattern in side_effect_patterns)
