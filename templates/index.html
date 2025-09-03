@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Code Editor - LLaMA3 Powered</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1><i class="fab fa-python"></i> Python Code Editor</h1>
+                <span class="subtitle">Powered by Ollama</span>
+            </div>
+            <div class="header-right">
+                <button id="runBtn" class="btn btn-primary">
+                    <i class="fas fa-play"></i> Run Code
+                </button>
+                <button id="saveBtn" class="btn btn-secondary">
+                    <i class="fas fa-save"></i> Save
+                </button>
+                <button id="newFileBtn" class="btn btn-outline">
+                    <i class="fas fa-plus"></i> New File
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h3><i class="fas fa-folder"></i> Workspace</h3>
+                    <button id="refreshFilesBtn" class="btn-icon" title="Refresh">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                
+                <div class="file-tree" id="fileTree">
+                    <!-- File tree will be populated here -->
+                </div>
+                
+                <div class="sidebar-footer">
+                    <button id="createFolderBtn" class="btn btn-sm btn-outline">
+                        <i class="fas fa-folder-plus"></i> New Folder
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Editor Area -->
+            <main class="editor-area">
+                <div class="editor-tabs">
+                    <div class="tab active" data-file="untitled.py">
+                        <span>untitled.py</span>
+                        <button class="tab-close" title="Close tab">×</button>
+                    </div>
+                </div>
+                
+                <div class="editor-container">
+                    <textarea id="codeEditor"></textarea>
+                </div>
+                
+                <!-- LLaMA3 Suggestions Panel -->
+                <div class="suggestions-panel" id="suggestionsPanel">
+                    <div class="panel-header">
+                        <h4><i class="fas fa-lightbulb"></i> Ollama Suggestions</h4>
+                        <button class="panel-toggle" id="suggestionsToggle">
+                            <i class="fas fa-chevron-up"></i>
+                        </button>
+                    </div>
+                    <div class="panel-content" id="suggestionsContent">
+                        <p class="placeholder">Start typing to get Ollama-powered suggestions...</p>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Output Panel -->
+            <aside class="output-panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-terminal"></i> Output</h3>
+                    <div class="panel-tabs">
+                        <button class="tab-btn active" data-tab="output">Output</button>
+                        <button class="tab-btn" data-tab="errors">Errors</button>
+                        <button class="tab-btn" data-tab="suggestions">Fixes</button>
+                    </div>
+                    <button class="panel-toggle" id="outputToggle">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                </div>
+                
+                <div class="panel-content">
+                    <div class="tab-content active" id="outputContent">
+                        <div class="output-placeholder">
+                            <i class="fas fa-play-circle"></i>
+                            <p>Click "Run Code" to execute your Python code</p>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-content" id="errorsContent">
+                        <div class="errors-placeholder">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <p>Execution errors will appear here</p>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-content" id="fixesContent">
+                        <div class="fixes-placeholder">
+                            <i class="fas fa-tools"></i>
+                            <p>Ollama fix suggestions will appear here</p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- Modals -->
+        <div class="modal" id="newFileModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Create New File</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="newFileName">File Name:</label>
+                        <input type="text" id="newFileName" placeholder="example.py" value="untitled.py">
+                    </div>
+                    <div class="form-group">
+                        <label for="newFileContent">Initial Content:</label>
+                        <textarea id="newFileContent" placeholder="# Your Python code here..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancelNewFile">Cancel</button>
+                    <button class="btn btn-primary" id="createNewFile">Create File</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal" id="newFolderModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Create New Folder</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="newFolderName">Folder Name:</label>
+                        <input type="text" id="newFolderName" placeholder="my_project">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancelNewFolder">Cancel</button>
+                    <button class="btn btn-primary" id="createNewFolder">Create Folder</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Processing...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/closebrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/matchbrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/trailingspace.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/selection/active-line.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
